@@ -1,0 +1,224 @@
+desc: Grand Staff Note Display
+author: Claude
+version: 1.1
+about: Displays incoming MIDI notes live on a grand staff (treble + bass clef) with note names labeled. Supports all 88 piano keys.
+
+options:gfx_hz=60
+in_pin:none
+out_pin:none
+
+@init
+
+memset(active_notes, -1, 16);
+
+function is_sharp (n) local(c) (
+  c = n % 12;
+  (c==1 || c==3 || c==6 || c==8 || c==10)
+);
+
+function chromatic_to_diatonic (c) (
+  c==0  ? 0 :
+  c==1  ? 0 :
+  c==2  ? 1 :
+  c==3  ? 1 :
+  c==4  ? 2 :
+  c==5  ? 3 :
+  c==6  ? 3 :
+  c==7  ? 4 :
+  c==8  ? 4 :
+  c==9  ? 5 :
+  c==10 ? 5 :
+          6
+);
+
+function midi_to_step (midi_note) local(oct_c, chroma, diat) (
+  oct_c  = (midi_note / 12|0) - 5;
+  chroma = midi_note % 12;
+  diat   = chromatic_to_diatonic(chroma);
+  oct_c * 7 + diat
+);
+
+@block
+
+while (midirecv(offset, msg1, msg2, msg3)) (
+  status = msg1 & 0xF0;
+  note   = msg2;
+  vel    = msg3;
+
+  status == 0x90 && vel > 0 ? (
+    found = 0;
+    i = 0;
+    loop(16,
+      active_notes[i] == note ? found = 1;
+      i += 1;
+    );
+    found == 0 ? (
+      i = 0;
+      loop(16,
+        active_notes[i] == -1 ? (
+          active_notes[i] = note;
+          i = 16;
+        );
+        i += 1;
+      );
+    );
+  );
+
+  (status == 0x80 || (status == 0x90 && vel == 0)) ? (
+    i = 0;
+    loop(16,
+      active_notes[i] == note ? active_notes[i] = -1;
+      i += 1;
+    );
+  );
+
+  midisend(offset, msg1, msg2, msg3);
+);
+
+@gfx 700 520
+
+gfx_clear = 0x1C1C2E;
+
+w = gfx_w;
+h = gfx_h;
+
+margin_left  = 80;
+margin_right = 40;
+staff_width  = w - margin_left - margin_right;
+line_gap     = 14;
+center_y     = h / 2;
+inter_gap    = line_gap * 3;
+
+treble_top    = center_y - inter_gap/2 - 4*line_gap;
+bass_top      = center_y + inter_gap/2;
+treble_bottom = treble_top + 4*line_gap;
+bass_bottom   = bass_top   + 4*line_gap;
+
+// Draw staff lines
+gfx_set(0.85, 0.85, 0.85, 1);
+i = 0;
+loop(5,
+  y = treble_top + i*line_gap;
+  gfx_line(margin_left, y, margin_left+staff_width, y, 0);
+  y = bass_top + i*line_gap;
+  gfx_line(margin_left, y, margin_left+staff_width, y, 0);
+  i += 1;
+);
+
+// Barlines
+gfx_line(margin_left, treble_top, margin_left, bass_bottom, 0);
+gfx_line(margin_left+staff_width, treble_top, margin_left+staff_width, bass_bottom, 0);
+
+// Clef symbols
+gfx_setfont(1, "Arial", 52);
+gfx_set(0.9, 0.9, 0.6, 1);
+gfx_x = margin_left - 62;
+gfx_y = treble_top - 14;
+gfx_drawstr("𝄞");
+
+gfx_setfont(1, "Arial", 34);
+gfx_x = margin_left - 56;
+gfx_y = bass_top + 2;
+gfx_drawstr("𝄢");
+
+// Title
+gfx_set(0.6, 0.6, 0.8, 1);
+gfx_setfont(1, "Arial", 13);
+gfx_x = w/2 - 70;
+gfx_y = 8;
+gfx_drawstr("Grand Staff Note Display");
+
+// middle C sits one ledger line below treble staff
+middle_c_y = treble_bottom + line_gap;
+note_r     = line_gap * 0.42;
+
+// Count active notes
+count = 0;
+i = 0;
+loop(16,
+  active_notes[i] >= 0 ? count += 1;
+  i += 1;
+);
+
+count == 0 ? (
+  gfx_set(0.45, 0.45, 0.55, 1);
+  gfx_setfont(1, "Arial", 15);
+  gfx_x = w/2 - 120;
+  gfx_y = h - 30;
+  gfx_drawstr("Play a note on your MIDI keyboard");
+) : (
+  spacing = staff_width / (count + 1);
+  idx = 0;
+  i   = 0;
+  loop(16,
+    active_notes[i] >= 0 ? (
+      midi   = active_notes[i];
+      step   = midi_to_step(midi);
+      ny     = middle_c_y - step * (line_gap / 2);
+      xp     = margin_left + spacing * (idx + 1);
+      chroma = midi % 12;
+      sharp  = is_sharp(midi);
+
+      // Note head
+      gfx_set(0.95, 0.85, 0.25, 1);
+      gfx_circle(xp, ny, note_r, 1, 1);
+
+      // Sharp symbol
+      sharp ? (
+        gfx_set(0.95, 0.6, 0.3, 1);
+        gfx_setfont(1, "Arial", 13);
+        gfx_x = xp - note_r - 10;
+        gfx_y = ny - 7;
+        gfx_drawstr("#");
+      );
+
+      // Note name label
+      gfx_set(1, 1, 1, 1);
+      gfx_setfont(1, "Arial", 13);
+      nm = chroma==0  ? "C"  :
+           chroma==1  ? "C#" :
+           chroma==2  ? "D"  :
+           chroma==3  ? "D#" :
+           chroma==4  ? "E"  :
+           chroma==5  ? "F"  :
+           chroma==6  ? "F#" :
+           chroma==7  ? "G"  :
+           chroma==8  ? "G#" :
+           chroma==9  ? "A"  :
+           chroma==10 ? "A#" :
+                        "B";
+      gfx_x = xp - 7;
+      gfx_y = ny + note_r + 3;
+      gfx_drawstr(nm);
+
+      // Ledger lines
+      gfx_set(0.75, 0.75, 0.75, 1);
+
+      // Middle C ledger line
+      step == 0 ? gfx_line(xp-note_r*2.2, ny, xp+note_r*2.2, ny, 0);
+
+      // Ledger lines above treble staff
+      step >= 11 ? (
+        ls = 11;
+        loop((step - 11) / 2 + 1,
+          ly = middle_c_y - ls * (line_gap/2);
+          gfx_line(xp-note_r*2.2, ly, xp+note_r*2.2, ly, 0);
+          ls += 2;
+        );
+      );
+
+      // Ledger lines below bass staff
+      step <= -11 ? (
+        ls = -11;
+        loop((-11 - step) / 2 + 1,
+          ly = middle_c_y - ls * (line_gap/2);
+          gfx_line(xp-note_r*2.2, ly, xp+note_r*2.2, ly, 0);
+          ls -= 2;
+        );
+      );
+
+      idx += 1;
+    );
+    i += 1;
+  );
+);
