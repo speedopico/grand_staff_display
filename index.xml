@@ -4,7 +4,7 @@
     <reapack name="grand_staff_display.jsfx" type="effect" desc="Grand Staff Note Display">
       <version name="1.7" author="YourName" time="2026-03-17T00:00:00Z">
         <changelog>Initial release</changelog>
-        <source>https://raw.githubusercontent.com/YOURUSERNAME/grand-staff-display/main/grand_staff_display.jsfx</source>
+        <source>https://raw.githubusercontent.com/speedopico/grand_staff_display/main/grand_staff_display.jsfx</source>
       </version>
     </reapack>
   </category>
