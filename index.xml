@@ -2,7 +2,7 @@
 <index version="1" name="Grand Staff Display">
   <category name="MIDI">
     <reapack name="grand_staff_display.jsfx" type="effect" desc="Grand Staff Note Display">
-      <version name="1.7" author="YourName" time="2026-03-17T00:00:00Z">
+      <version name="1.7" author="Mr. Claude" time="2026-03-17T00:00:00Z">
         <changelog>Initial release</changelog>
         <source>https://raw.githubusercontent.com/speedopico/grand_staff_display/main/grand_staff_display.jsfx</source>
       </version>
